@@ -13,15 +13,19 @@ from math import fabs
 from itertools import combinations
 from copy import deepcopy
 
-from cbs.a_star import AStar
+from a_star import AStar
 
 class Location(object):
     def __init__(self, x=-1, y=-1):
         self.x = x
         self.y = y
-    def __eq__(self, other):
+        
+    def __eq__(self, other) -> bool:
+        # Check equality with another location
         return self.x == other.x and self.y == other.y
-    def __str__(self):
+    
+    def __str__(self) -> str:
+        # String representation of location
         return str((self.x, self.y))
 
 class State(object):
@@ -30,12 +34,18 @@ class State(object):
         self.location = location
     def __eq__(self, other):
         return self.time == other.time and self.location == other.location
-    def __hash__(self):
-        return hash(str(self.time)+str(self.location.x) + str(self.location.y))
-    def is_equal_except_time(self, state):
+    
+    def __hash__(self) -> int:
+        # Hash function for state
+        return hash(str(self.time) + str(self.location.x) + str(self.location.y))
+    
+    def is_equal_except_time(self, state) -> bool:
+        # Check if two states are equal except for time
         return self.location == state.location
+    
     def __str__(self):
         return str((self.time, self.location.x, self.location.y))
+
 
 class Conflict(object):
     VERTEX = 1
@@ -51,8 +61,8 @@ class Conflict(object):
         self.location_2 = Location()
 
     def __str__(self):
-        return '(' + str(self.time) + ', ' + self.agent_1 + ', ' + self.agent_2 + \
-             ', '+ str(self.location_1) + ', ' + str(self.location_2) + ')'
+        return f'({str(self.time)}, {self.agent_1}, {self.agent_2}, {str(self.location_1)}, {str(self.location_2)})'
+
 
 class VertexConstraint(object):
     def __init__(self, time, location):
@@ -64,7 +74,8 @@ class VertexConstraint(object):
     def __hash__(self):
         return hash(str(self.time)+str(self.location))
     def __str__(self):
-        return '(' + str(self.time) + ', '+ str(self.location) + ')'
+        return f'({str(self.time)}, {str(self.location)})'
+
 
 class EdgeConstraint(object):
     def __init__(self, time, location_1, location_2):
@@ -77,7 +88,7 @@ class EdgeConstraint(object):
     def __hash__(self):
         return hash(str(self.time) + str(self.location_1) + str(self.location_2))
     def __str__(self):
-        return '(' + str(self.time) + ', '+ str(self.location_1) +', '+ str(self.location_2) + ')'
+        return f'({str(self.time)}, {str(self.location_1)}, {str(self.location_2)})'
 
 class Constraints(object):
     def __init__(self):
@@ -89,13 +100,13 @@ class Constraints(object):
         self.edge_constraints |= other.edge_constraints
 
     def __str__(self):
-        return "VC: " + str([str(vc) for vc in self.vertex_constraints])  + \
-            "EC: " + str([str(ec) for ec in self.edge_constraints])
+        return f"VC: {[str(vc) for vc in self.vertex_constraints]}EC: {[str(ec) for ec in self.edge_constraints]}"
+
 
 class Environment(object):
-    def __init__(self, dimension, agents, obstacles):
-        self.dimension = dimension
-        self.obstacles = obstacles
+    def __init__(self, dimension: tuple, agents: list, obstacles: list):
+        self.dimension = dimension  # Dimensions of the grid, e.g. [3, 3]
+        self.obstacles = obstacles  # List of obstacle locations
 
         self.agents = agents
         self.agent_dict = {}
@@ -107,7 +118,7 @@ class Environment(object):
 
         self.a_star = AStar(self)
 
-    def get_neighbors(self, state):
+    def get_neighbors(self, state) -> list:
         neighbors = []
 
         # Wait action
@@ -133,8 +144,9 @@ class Environment(object):
         return neighbors
 
 
-    def get_first_conflict(self, solution):
-        max_t = max([len(plan) for plan in solution.values()])
+    def get_first_conflict(self, solution: dict):
+        # Identify the first conflict in the solution
+        max_t = max(len(plan) for plan in solution.values())
         result = Conflict()
         for t in range(max_t):
             for agent_1, agent_2 in combinations(solution.keys(), 2):
@@ -165,7 +177,8 @@ class Environment(object):
                     return result
         return False
 
-    def create_constraints_from_conflict(self, conflict):
+    def create_constraints_from_conflict(self, conflict: Conflict) -> dict:
+        # Create constraints from a given conflict
         constraint_dict = {}
         if conflict.type == Conflict.VERTEX:
             v_constraint = VertexConstraint(conflict.time, conflict.location_1)
@@ -189,28 +202,29 @@ class Environment(object):
 
         return constraint_dict
 
-    def get_state(self, agent_name, solution, t):
+    def get_state(self, agent_name: str, solution: dict, t: int) -> State:
         if t < len(solution[agent_name]):
             return solution[agent_name][t]
         else:
             return solution[agent_name][-1]
 
-    def state_valid(self, state):
+    def state_valid(self, state: State) -> bool:
         return state.location.x >= 0 and state.location.x < self.dimension[0] \
             and state.location.y >= 0 and state.location.y < self.dimension[1] \
             and VertexConstraint(state.time, state.location) not in self.constraints.vertex_constraints \
             and (state.location.x, state.location.y) not in self.obstacles
 
-    def transition_valid(self, state_1, state_2):
+    def transition_valid(self, state_1: State, state_2: State) -> bool:
+        # Check if a transition between two states is valid (not violating edge constraints)
         return EdgeConstraint(state_1.time, state_1.location, state_2.location) not in self.constraints.edge_constraints
 
     def is_solution(self, agent_name):
         pass
 
-    def admissible_heuristic(self, state, agent_name):
+    def admissible_heuristic(self, state: State, agent_name: str) -> float:
+        # Calculate admissible heuristic for A* search
         goal = self.agent_dict[agent_name]["goal"]
         return fabs(state.location.x - goal.location.x) + fabs(state.location.y - goal.location.y)
-
 
     def is_at_goal(self, state, agent_name):
         goal_state = self.agent_dict[agent_name]["goal"]
@@ -227,14 +241,15 @@ class Environment(object):
         solution = {}
         for agent in self.agent_dict.keys():
             self.constraints = self.constraint_dict.setdefault(agent, Constraints())
-            local_solution = self.a_star.search(agent)
-            if not local_solution:
+            if local_solution := self.a_star.search(agent):
+                solution[agent] = local_solution
+            else:
                 return False
-            solution.update({agent:local_solution})
         return solution
 
-    def compute_solution_cost(self, solution):
-        return sum([len(path) for path in solution.values()])
+    def compute_solution_cost(self, solution: dict) -> int:
+        return sum(len(path) for path in solution.values())
+
 
 class HighLevelNode(object):
     def __init__(self):
@@ -252,11 +267,13 @@ class HighLevelNode(object):
     def __lt__(self, other):
         return self.cost < other.cost
 
+
 class CBS(object):
     def __init__(self, environment):
         self.env = environment
         self.open_set = set()
         self.closed_set = set()
+        
     def search(self):
         start = HighLevelNode()
         # TODO: Initialize it in a better way
@@ -335,9 +352,7 @@ def main():
         return
 
     # Write to output file
-    output = dict()
-    output["schedule"] = solution
-    output["cost"] = env.compute_solution_cost(solution)
+    output = {"schedule": solution, "cost": env.compute_solution_cost(solution)}
     with open(args.output, 'w') as output_yaml:
         yaml.safe_dump(output, output_yaml)
 

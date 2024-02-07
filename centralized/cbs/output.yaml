@@ -1,21 +1,8 @@
-cost: 9
+cost: 11
 schedule:
   agent0:
   - t: 0
     x: 0
-    y: 0
-  - t: 1
-    x: 0
-    y: 0
-  - t: 2
-    x: 1
-    y: 0
-  - t: 3
-    x: 2
-    y: 0
-  agent1:
-  - t: 0
-    x: 2
     y: 0
   - t: 1
     x: 1
@@ -25,7 +12,26 @@ schedule:
     y: 1
   - t: 3
     x: 1
-    y: 0
+    y: 2
   - t: 4
-    x: 0
+    x: 2
+    y: 2
+  agent1:
+  - t: 0
+    x: 2
     y: 0
+  - t: 1
+    x: 2
+    y: 0
+  - t: 2
+    x: 1
+    y: 0
+  - t: 3
+    x: 1
+    y: 1
+  - t: 4
+    x: 1
+    y: 2
+  - t: 5
+    x: 0
+    y: 2

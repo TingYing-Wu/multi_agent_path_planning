@@ -4,6 +4,7 @@ Collision avoidance using Nonlinear Model-Predictive Control
 author: Ashwin Bose (atb033@github.com)
 """
 
+
 from utils.multi_robot_plot import plot_robot_and_obstacles
 from utils.create_obstacles import create_obstacles
 import numpy as np
@@ -22,7 +23,7 @@ Qc = 5.
 kappa = 4.
 
 # nmpc parameters
-HORIZON_LENGTH = int(4)
+HORIZON_LENGTH = 4
 NMPC_TIMESTEP = 0.3
 upper_bound = [(1/np.sqrt(2)) * VMAX] * HORIZON_LENGTH * 2
 lower_bound = [-(1/np.sqrt(2)) * VMAX] * HORIZON_LENGTH * 2

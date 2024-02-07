@@ -16,7 +16,7 @@ class OptimizationClass:
 
         self.vertices = list(self.stn.vertices)
         self.vertices = sorted(self.vertices, key = lambda i:(i.agent, i.time))
-        self.agent_names = list(set([i.agent for i in self.vertices])-{'start', 'end'})
+        self.agent_names = list({i.agent for i in self.vertices} - {'start', 'end'})
 
     def optimize(self):
         
@@ -24,9 +24,7 @@ class OptimizationClass:
         (A_equ, b_equ) = self.get_equality_constraints()
         c = self.get_cost_matrix()
 
-        res = linprog(c, A_ub=A_in, b_ub=b_in, A_eq=A_equ, b_eq=b_equ)
-
-        return res
+        return linprog(c, A_ub=A_in, b_ub=b_in, A_eq=A_equ, b_eq=b_equ)
 
     # def generate_
     def get_cost_function(self, variables):
@@ -89,14 +87,14 @@ class OptimizationClass:
         schedule = {agent_name: [] for agent_name in self.agent_names}
 
         # output_list
-        for i in  range(len(self.vertices)):
+        for i in range(len(self.vertices)):
             for agent_name in self.agent_names:
                 if self.vertices[i].agent == agent_name:
-                    point = {}
-                    point['x'] = self.vertices[i].location.x
-                    point['y'] = self.vertices[i].location.y
-                    point['t'] = float("{0:.3f}".format(schedule_list.x[i]))
-
+                    point = {
+                        'x': self.vertices[i].location.x,
+                        'y': self.vertices[i].location.y,
+                        't': float("{0:.3f}".format(schedule_list.x[i])),
+                    }
                     schedule[agent_name].append(point)           
 
         return schedule
