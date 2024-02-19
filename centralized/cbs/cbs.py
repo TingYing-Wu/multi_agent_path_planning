@@ -50,15 +50,13 @@ class State(object):
 class Conflict(object):
     VERTEX = 1
     EDGE = 2
-    def __init__(self):
-        self.time = -1
-        self.type = -1
-
-        self.agent_1 = ''
-        self.agent_2 = ''
-
-        self.location_1 = Location()
-        self.location_2 = Location()
+    def __init__(self, time=-1, conflict_type=-1, agent_1='', agent_2='', location_1=Location(), location_2=Location()):
+        self.time = time
+        self.type = conflict_type
+        self.agent_1 = agent_1
+        self.agent_2 = agent_2
+        self.location_1 = location_1
+        self.location_2 = location_2
 
     def __str__(self):
         return f'({str(self.time)}, {self.agent_1}, {self.agent_2}, {str(self.location_1)}, {str(self.location_2)})'
@@ -92,10 +90,11 @@ class EdgeConstraint(object):
 
 class Constraints(object):
     def __init__(self):
-        self.vertex_constraints = set()
-        self.edge_constraints = set()
+        self.vertex_constraints = set() # Set of VertexConstraint
+        self.edge_constraints = set()   # Set of EdgeConstraint
 
-    def add_constraint(self, other):
+    def add_constraint(self, other: 'Constraints'):
+        # Add constraints from another constraint object
         self.vertex_constraints |= other.vertex_constraints
         self.edge_constraints |= other.edge_constraints
 
@@ -119,6 +118,7 @@ class Environment(object):
         self.a_star = AStar(self)
 
     def get_neighbors(self, state) -> list:
+        """ Get valid neighboring states of a given state """
         neighbors = []
 
         # Wait action
@@ -145,35 +145,39 @@ class Environment(object):
 
 
     def get_first_conflict(self, solution: dict):
-        # Identify the first conflict in the solution
+        """ Examine the paths of all agents to find any instance where two agents
+            1. occupy the same location at the same time (vertex conflict)
+            2. cross the same edge in opposite directions at the same time (edge conflict) 
+        """
+        # Get the entire duration of the plan
         max_t = max(len(plan) for plan in solution.values())
         result = Conflict()
+        # Identify the first conflict in the solution by traversing the entire plan
         for t in range(max_t):
+            # Check vertex conflict
             for agent_1, agent_2 in combinations(solution.keys(), 2):
+                # Fetch the State(time, position) of each agent at time t
                 state_1 = self.get_state(agent_1, solution, t)
                 state_2 = self.get_state(agent_2, solution, t)
+                # If the locations of both states are equal, that is the agents in the same location at the same time
                 if state_1.is_equal_except_time(state_2):
-                    result.time = t
-                    result.type = Conflict.VERTEX
-                    result.location_1 = state_1.location
-                    result.agent_1 = agent_1
-                    result.agent_2 = agent_2
+                    result = Conflict(time = t, conflict_type = Conflict.VERTEX, 
+                                      agent_1 = agent_1, agent_2 = agent_2, 
+                                      location_1 = state_1.location)
                     return result
 
+            # Check edge conflict
             for agent_1, agent_2 in combinations(solution.keys(), 2):
                 state_1a = self.get_state(agent_1, solution, t)
                 state_1b = self.get_state(agent_1, solution, t+1)
 
                 state_2a = self.get_state(agent_2, solution, t)
                 state_2b = self.get_state(agent_2, solution, t+1)
-
+                # Edge conflict, if the agents swap their locations between these time steps.
                 if state_1a.is_equal_except_time(state_2b) and state_1b.is_equal_except_time(state_2a):
-                    result.time = t
-                    result.type = Conflict.EDGE
-                    result.agent_1 = agent_1
-                    result.agent_2 = agent_2
-                    result.location_1 = state_1a.location
-                    result.location_2 = state_1b.location
+                    result = Conflict(time = t, conflict_type = Conflict.EDGE, 
+                                      agent_1 = agent_1, agent_2 = agent_2, 
+                                      location_1 = state_1a.location, location_2 = state_1b.location)
                     return result
         return False
 
@@ -181,9 +185,11 @@ class Environment(object):
         # Create constraints from a given conflict
         constraint_dict = {}
         if conflict.type == Conflict.VERTEX:
+            # Create for the time and location of the conflict
             v_constraint = VertexConstraint(conflict.time, conflict.location_1)
             constraint = Constraints()
             constraint.vertex_constraints |= {v_constraint}
+            # Both agents involved in the conflict are given the same constraint to avoid the conflicting location at the specific time
             constraint_dict[conflict.agent_1] = constraint
             constraint_dict[conflict.agent_2] = constraint
 
@@ -197,8 +203,8 @@ class Environment(object):
             constraint1.edge_constraints |= {e_constraint1}
             constraint2.edge_constraints |= {e_constraint2}
 
-            constraint_dict[conflict.agent_1] = constraint1
-            constraint_dict[conflict.agent_2] = constraint2
+            constraint_dict[conflict.agent_1] = constraint1 # 1 -> 2
+            constraint_dict[conflict.agent_2] = constraint2 # 2 -> 1
 
         return constraint_dict
 
@@ -237,7 +243,8 @@ class Environment(object):
 
             self.agent_dict.update({agent['name']:{'start':start_state, 'goal':goal_state}})
 
-    def compute_solution(self):
+    def compute_solution(self) -> dict:
+        """ Compute the solution for all agents using A* search algorithm """
         solution = {}
         for agent in self.agent_dict.keys():
             self.constraints = self.constraint_dict.setdefault(agent, Constraints())
@@ -269,12 +276,12 @@ class HighLevelNode(object):
 
 
 class CBS(object):
-    def __init__(self, environment):
-        self.env = environment
-        self.open_set = set()
-        self.closed_set = set()
+    def __init__(self, environment: Environment):
+        self.env = environment  # Initialize CBS algorithm with an environment
+        self.open_set = set()   # Open set for the high-level search
+        self.closed_set = set() # Closed set for the high-level search
         
-    def search(self):
+    def search(self) -> dict:
         start = HighLevelNode()
         # TODO: Initialize it in a better way
         start.constraint_dict = {}
@@ -288,15 +295,16 @@ class CBS(object):
         self.open_set |= {start}
 
         while self.open_set:
-            P = min(self.open_set)
+            # Find the HighLevelNode in the open_set with the minimum cost
+            P = min(self.open_set)  # P is a HighLevelNode with the minimum cost
             self.open_set -= {P}
             self.closed_set |= {P}
 
-            self.env.constraint_dict = P.constraint_dict
+            self.env.constraint_dict = P.constraint_dict    # Include vertex and edge constraints
             conflict_dict = self.env.get_first_conflict(P.solution)
             if not conflict_dict:
+                # No conflict found, the plan based on A* search is the optimal solution
                 print("solution found")
-
                 return self.generate_plan(P.solution)
 
             constraint_dict = self.env.create_constraints_from_conflict(conflict_dict)
@@ -317,7 +325,8 @@ class CBS(object):
 
         return {}
 
-    def generate_plan(self, solution):
+    def generate_plan(self, solution: dict) -> dict:
+        """ Generate the final plan from the solution """
         plan = {}
         for agent, path in solution.items():
             path_dict_list = [{'t':state.time, 'x':state.location.x, 'y':state.location.y} for state in path]
@@ -327,11 +336,11 @@ class CBS(object):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("param", help="input file containing map and obstacles")
-    parser.add_argument("output", help="output file with the schedule")
+    parser.add_argument("param", help="input file containing map and obstacles, e.g. input.yaml")
+    parser.add_argument("output", help="output file with the schedule, e.g. output.yaml")
     args = parser.parse_args()
 
-    # Read from input file
+    # Read parameters including map and agents from the input file
     with open(args.param, 'r') as param_file:
         try:
             param = yaml.load(param_file, Loader=yaml.FullLoader)
@@ -341,7 +350,8 @@ def main():
     dimension = param["map"]["dimensions"]
     obstacles = param["map"]["obstacles"]
     agents = param['agents']
-
+    
+    # Initialize the environment based on the map, obstacles and agents
     env = Environment(dimension, agents, obstacles)
 
     # Searching
